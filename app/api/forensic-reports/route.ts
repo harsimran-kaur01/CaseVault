@@ -180,7 +180,7 @@ export async function POST(request: Request) {
     // 5. Verify forensic test is accessible through RLS
     const { data: test, error: testError } = await supabase
       .from("forensic_test")
-      .select("test_id, evidence_id, status")
+      .select("test_id, evidence_id, status, assigned_examiner_id")
       .eq("test_id", test_id)
       .maybeSingle();
 
@@ -192,13 +192,21 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-
     if (!test) {
       return NextResponse.json(
         { error: "Forensic test not found or access denied." },
         { status: 404 }
       );
     }
+    if (test.assigned_examiner_id !== examinerId) {
+      return NextResponse.json(
+        {
+          error: "You are not assigned to this forensic test.",
+        },
+        { status: 403 }
+      );
+    }
+
 
     if (test.status === "cancelled") {
       return NextResponse.json(

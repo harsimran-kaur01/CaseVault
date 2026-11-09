@@ -1,11 +1,23 @@
+
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { updateForensicTestSchema } from "@/lib/validation/forensic-test";
 
-type RouteContext = { params: Promise<{ id: string }> };
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
-const SELECT_FIELDS =
-  "test_id, evidence_id, test_type, requested_by, request_date, priority, status, notes";
+const SELECT_FIELDS = `
+  test_id,
+  evidence_id,
+  test_type,
+  requested_by,
+  request_date,
+  priority,
+  status,
+  assigned_examiner_id,
+  notes
+`;
 
 export async function GET(
   _request: Request,
@@ -16,12 +28,17 @@ export async function GET(
     const testId = Number(id);
 
     if (!Number.isSafeInteger(testId) || testId <= 0) {
-      return NextResponse.json({ error: "Invalid test ID." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid test ID." },
+        { status: 400 }
+      );
     }
 
     const supabase = await createClient();
 
-    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const { data: authData, error: authError } =
+      await supabase.auth.getUser();
+
     if (authError || !authData.user) {
       return NextResponse.json(
         { error: "Unauthorized. Please log in." },
@@ -53,7 +70,10 @@ export async function GET(
     return NextResponse.json({ success: true, test });
   } catch (error) {
     console.error("GET /api/forensic-tests/[id] failed:", error);
-    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error." },
+      { status: 500 }
+    );
   }
 }
 
@@ -66,12 +86,17 @@ export async function PATCH(
     const testId = Number(id);
 
     if (!Number.isSafeInteger(testId) || testId <= 0) {
-      return NextResponse.json({ error: "Invalid test ID." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid test ID." },
+        { status: 400 }
+      );
     }
 
     const supabase = await createClient();
 
-    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const { data: authData, error: authError } =
+      await supabase.auth.getUser();
+
     if (authError || !authData.user) {
       return NextResponse.json(
         { error: "Unauthorized. Please log in." },
@@ -80,6 +105,7 @@ export async function PATCH(
     }
 
     let body: unknown;
+
     try {
       body = await request.json();
     } catch {
@@ -90,19 +116,22 @@ export async function PATCH(
     }
 
     const validation = updateForensicTestSchema.safeParse(body);
+
     if (!validation.success) {
       return NextResponse.json(
         {
           error: "Validation failed.",
-          details: validation.error.issues.map((i) => ({
-            path: i.path,
-            message: i.message,
+          details: validation.error.issues.map((issue) => ({
+            path: issue.path,
+            message: issue.message,
           })),
         },
         { status: 400 }
       );
     }
 
+    // RLS restricts analysts to tests assigned to their person ID.
+    // Column privileges restrict updates to test_type, priority and notes.
     const { data: test, error: updateError } = await supabase
       .from("forensic_test")
       .update(validation.data)
@@ -112,14 +141,6 @@ export async function PATCH(
 
     if (updateError) {
       console.error("Forensic test update failed:", updateError.message);
-      if (updateError.code === "P0001") {
-        return NextResponse.json(
-          {
-            error: updateError.message,
-          },
-          { status: 409 }
-        );
-     }
 
       if (updateError.code === "42501") {
         return NextResponse.json(
@@ -127,9 +148,10 @@ export async function PATCH(
           { status: 403 }
         );
       }
+
       if (updateError.code === "23514") {
         return NextResponse.json(
-          { error: "Invalid priority or status value." },
+          { error: "Invalid forensic test value." },
           { status: 400 }
         );
       }
@@ -147,9 +169,16 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ success: true, test });
+    return NextResponse.json({
+      success: true,
+      message: "Forensic test updated successfully.",
+      test,
+    });
   } catch (error) {
     console.error("PATCH /api/forensic-tests/[id] failed:", error);
-    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error." },
+      { status: 500 }
+    );
   }
 }
