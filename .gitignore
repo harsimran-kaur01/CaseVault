@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temporary testing and debugging files
+_cs_live.mjs
+_cs_spec.mjs
+_cs_spec2.mjs
+_cs_spec3.mjs
+_uq_probe.mjs
+cookies.txt
