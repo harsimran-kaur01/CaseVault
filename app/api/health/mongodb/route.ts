@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 
@@ -10,11 +11,18 @@ export async function GET() {
       status: "connected",
       database: process.env.MONGODB_DB,
     });
-  } catch (error) {
-    console.error("MongoDB connection failed:", error);
+  } catch (error: any) {
+    console.error("MongoDB detailed error:", error);
 
     return NextResponse.json(
-      { status: "error", message: "MongoDB connection failed" },
+      {
+        status: "error",
+        message: error?.message || "Unknown MongoDB error",
+        code: error?.code || null,
+        codeName: error?.codeName || null,
+        syscall: error?.syscall || null,
+        hostname: error?.hostname || null,
+      },
       { status: 500 }
     );
   }

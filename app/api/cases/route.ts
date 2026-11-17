@@ -29,7 +29,8 @@ export async function GET() {
         date_opened,
         date_closed,
         status_id,
-        location_id
+        location_id,
+        case_status ( status_name )
       `)
       .order("date_opened", { ascending: false })
       .limit(50);

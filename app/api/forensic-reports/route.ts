@@ -51,24 +51,27 @@ export async function GET() {
 
     const reportIds = pgReports.map((r) => r.report_id);
 
-    const mongo = (await clientPromise).db(MONGO_DB);
-
-    const mongoDocs = await mongo
-      .collection(MONGO_COLLECTION)
-      .find({ report_id: { $in: reportIds } })
-      .toArray();
-
-    const mongoMap = new Map(
-      mongoDocs.map((doc) => [doc.report_id as number, doc])
-    );
+    // Attempt MongoDB enrichment — degrade gracefully if unavailable.
+    let mongoMap = new Map<number, Record<string, unknown>>();
+    try {
+      const mongo = (await clientPromise).db(MONGO_DB);
+      const mongoDocs = await mongo
+        .collection(MONGO_COLLECTION)
+        .find({ report_id: { $in: reportIds } })
+        .toArray();
+      mongoMap = new Map(
+        mongoDocs.map((doc) => [doc.report_id as number, doc])
+      );
+    } catch (mongoErr) {
+      console.warn("MongoDB unavailable — returning PostgreSQL data only:", mongoErr);
+    }
 
     const reports = pgReports.map((pg) => {
       const mongoDoc = mongoMap.get(pg.report_id);
-
       return {
         ...pg,
         mongo_document: mongoDoc
-          ? { ...mongoDoc, _id: mongoDoc._id.toHexString() }
+          ? { ...mongoDoc, _id: (mongoDoc._id as { toHexString(): string }).toHexString() }
           : null,
       };
     });
@@ -76,6 +79,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       total: reports.length,
+      mongo_available: mongoMap.size > 0,
       reports,
     });
   } catch (error) {

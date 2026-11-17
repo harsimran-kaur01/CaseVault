@@ -1,3 +1,4 @@
+
 import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
@@ -10,11 +11,11 @@ const globalWithMongo = globalThis as typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>;
 };
 
-const clientPromise =
+const clientPromise: Promise<MongoClient> =
   globalWithMongo._mongoClientPromise ??
   new MongoClient(uri, {
-    serverSelectionTimeoutMS: 10000,
-    connectTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
   }).connect();
 
 if (process.env.NODE_ENV !== "production") {
